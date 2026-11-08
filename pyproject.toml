@@ -1,12 +1,12 @@
 [project]
 name = "phone-harness"
 version = "0.3.3"
-description = "Let an agent drive a real phone: an iPhone through macOS iPhone Mirroring, an Android over adb, a rented cloud Android, or a cloud iPhone over HTTPS"
+description = "Let an agent drive a real phone: an iPhone through macOS iPhone Mirroring or over USB from any OS, an Android over adb, a rented cloud Android, or a cloud iPhone over HTTPS"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.10"
-keywords = ["iphone", "android", "adb", "automation", "agent", "iphone-mirroring", "cloud-phone"]
+keywords = ["iphone", "android", "adb", "automation", "agent", "iphone-mirroring", "webdriveragent", "cloud-phone"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",

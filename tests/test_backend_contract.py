@@ -32,7 +32,8 @@ def sent_by_helpers():
 
 def backends():
     from phone_harness.android import Android
-    found = {"android": Android}
+    from phone_harness.ios_usb import IPhoneUSB
+    found = {"android": Android, "ios-usb": IPhoneUSB}
     if sys.platform == "darwin":
         try:
             found["ios"] = importlib.import_module("phone_harness.ios").IPhone

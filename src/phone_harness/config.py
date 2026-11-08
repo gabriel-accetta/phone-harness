@@ -2,8 +2,9 @@
 
 Kept apart because they live differently:
 
-  config   intent — the default platform, the adb binary, how often to poke
-           a phone awake. Hand-editable, small, worth putting in dotfiles.
+  config   intent — the default platform, the adb and go-ios binaries, how
+           often to poke a phone awake. Hand-editable, small, worth putting
+           in dotfiles.
              ~/.config/phone-harness/config.json
            The cloud sign-in sits beside it, private to the user:
              ~/.config/phone-harness/auth.json
@@ -14,6 +15,7 @@ Kept apart because they live differently:
              ~/.local/state/phone-harness/cloud.json
              ~/.local/state/phone-harness/telemetry.json
              ~/.local/state/phone-harness/run/awake.pid
+             ~/.local/state/phone-harness/run/ios-usb.json   (WebDriverAgent link)
   cache    the once-a-day update check: when it last looked, and the latest
            version it saw.
              ~/.cache/phone-harness/update.json
@@ -90,6 +92,13 @@ DEFAULTS = {
     "ios": {
         "restore_clipboard": False,   # put the old clipboard back after a paste
         "paste_settle": 2.0,          # ...after this many seconds, if so
+    },
+    "ios_usb": {
+        "go_ios": "ios",       # the go-ios binary; a path if it is not on PATH
+        "udid": "",            # which iPhone, when several are plugged in
+        "wda_bundle": "",      # the WebDriverAgent runner's bundle id; empty = find it
+        "wda": "usb",          # usb = start it and reach it over the cable; HOST:PORT = one you run
+        "autostart": True,     # the first helper call starts WebDriverAgent itself
     },
 }
 
@@ -370,7 +379,7 @@ def _config_parser():
                          description="Print one setting as JSON.")
     get.add_argument("key", metavar="KEY", help="setting name")
     setp = sub.add_parser("set", help="set one setting",
-                          description="Set one setting. platform must be ios or android.")
+                          description="Set one setting. platform must be ios, ios-usb or android.")
     setp.add_argument("key", metavar="KEY", help="setting name")
     setp.add_argument("value", metavar="VALUE", help="new value")
     unset = sub.add_parser("unset", help="remove one setting",
@@ -397,8 +406,8 @@ def cli(args):
         print(json.dumps(value) if source != "unset" else f"{ns.key}: unset")
         return 0 if source != "unset" else 1
     if ns.cmd == "set":
-        if ns.key == "platform" and ns.value not in ("ios", "android"):
-            print("platform must be ios or android"); return 2
+        if ns.key == "platform" and ns.value not in ("ios", "ios-usb", "android"):
+            print("platform must be ios, ios-usb or android"); return 2
         v = set(ns.key, ns.value)
         print(f"{ns.key} = {json.dumps(v)}")
         return 0

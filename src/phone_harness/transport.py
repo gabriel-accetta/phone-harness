@@ -134,7 +134,10 @@ class Backend:
 def connect(platform=None, **kw):
     """Build a backend. Explicit argument, else PHONE_HARNESS_PLATFORM, else
     `platform` in the config file (`phone-harness config set platform …`),
-    else ios.
+    else ios on a Mac and android elsewhere.
+
+    "ios" is the iPhone Mirroring window and needs a Mac; "ios-usb" is an
+    iPhone on a cable driven through WebDriverAgent, from any OS.
 
     Returns an object rather than installing a module global, so a script can
     hold two devices at once instead of being limited to one per process.
@@ -167,11 +170,15 @@ def connect(platform=None, **kw):
                         cloud.report_ended(lost)
                     raise cloud.CloudPhoneError(cloud.ended_message(lost))
     platform = platform.lower()
+    if platform in ("ios-usb", "iphone-usb"):
+        # Any OS: WebDriverAgent on the phone, reached over the cable.
+        return importlib.import_module(".ios_usb", __package__).IPhoneUSB(**kw)
     if platform in ("ios", "iphone", "ipad"):
         if sys.platform != "darwin":
-            raise RuntimeError("iPhone control needs macOS (it drives the iPhone Mirroring app); "
-                               "on this machine use Android: PHONE_HARNESS_PLATFORM=android "
-                               "or `phone-harness config set platform android`")
+            raise RuntimeError("iPhone Mirroring needs macOS. From this machine an iPhone on a "
+                               "USB cable works through WebDriverAgent: "
+                               "`phone-harness config set platform ios-usb` (setup/ios-usb.md). "
+                               "Or use Android: `phone-harness config set platform android`")
         return importlib.import_module(".ios", __package__).IPhone(**kw)
     if platform == "android":
         return importlib.import_module(".android", __package__).Android(**kw)

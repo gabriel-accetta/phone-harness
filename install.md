@@ -16,6 +16,7 @@ the helper names and signatures are in the skill (`SKILL.md`, printed by
 | Mode | Needs | Detail |
 | --- | --- | --- |
 | Personal iPhone | macOS 15+, paired iPhone Mirroring (iOS 18+), Accessibility + Screen Recording for the app that runs Python | [setup/ios.md](https://github.com/phone-harness/phone-harness/blob/main/setup/ios.md) |
+| Personal iPhone, no Mac | Windows, Linux or macOS; go-ios; Apple's USB service; a cable; WebDriverAgent signed with the user's Apple ID | [setup/ios-usb.md](https://github.com/phone-harness/phone-harness/blob/main/setup/ios-usb.md) |
 | Android on the desk | macOS, Linux or Windows; adb; USB or Wireless debugging | [setup/android.md](https://github.com/phone-harness/phone-harness/blob/main/setup/android.md) |
 | Cloud iPhone | HTTPS only; a signed-in account | [setup/cloud.md](https://github.com/phone-harness/phone-harness/blob/main/setup/cloud.md) |
 | Cloud Android | HTTPS, adb, and outbound TCP to the phone's adb port | [setup/cloud.md](https://github.com/phone-harness/phone-harness/blob/main/setup/cloud.md) |
@@ -30,9 +31,10 @@ uv tool install --python 3.12 --upgrade --force phone-harness
 ```
 
 Needs [uv](https://docs.astral.sh/uv/) and Python 3.12. The package itself
-accepts Python 3.10 or newer. **iPhone Mirroring needs a Mac.** A cloud
-iPhone (`cloud start` of the iOS catalog entry) is driven over HTTPS from
-any OS. **Android works on macOS, Linux and Windows** and is the default
+accepts Python 3.10 or newer. **iPhone Mirroring needs a Mac.** Without
+one, the user's iPhone on a USB cable works through WebDriverAgent
+(`platform ios-usb`, see below). A cloud iPhone (`cloud start` of the iOS
+catalog entry) is driven over HTTPS from any OS. **Android works on macOS, Linux and Windows** and is the default
 off a Mac.
 
 Register the skill so the agent reaches for it:
@@ -65,11 +67,11 @@ That reaches the default phone. If it fails, use the sections below.
   directory does not exist. An existing workspace is left untouched,
   including a custom `agent_helpers.py`. To get a fresh default, delete
   the workspace folder; it is recreated on the next run.
-- The default phone is `phone-harness config set platform ios|android`;
+- The default phone is `phone-harness config set platform ios|ios-usb|android`;
   `phone-harness config` shows every setting and where it came from;
   `PHONE_HARNESS_PLATFORM=android phone-harness …` overrides for one call.
-- `phone-harness --doctor` checks the default phone; `--doctor ios` or
-  `--doctor android` checks the other.
+- `phone-harness --doctor` checks the default phone; `--doctor ios`,
+  `--doctor ios-usb` or `--doctor android` checks another.
 - Re-run the skill registration after `phone-harness update` so the
   agent's copy matches the code. `phone-harness update` does the upgrade:
   `uv tool upgrade phone-harness` when this is a uv tool, `git pull
@@ -109,6 +111,11 @@ writing into the checkout.
 
 See [setup/ios.md](https://github.com/phone-harness/phone-harness/blob/main/setup/ios.md), then `phone-harness doctor ios`.
 
+No Mac: see [setup/ios-usb.md](https://github.com/phone-harness/phone-harness/blob/main/setup/ios-usb.md),
+then `phone-harness config set platform ios-usb` and `phone-harness doctor ios-usb`.
+`phone-harness ios-usb` shows what is attached; `phone-harness ios-usb stop`
+stops WebDriverAgent on the phone.
+
 ## Android
 
 See [setup/android.md](https://github.com/phone-harness/phone-harness/blob/main/setup/android.md), then `phone-harness doctor android`.
@@ -142,6 +149,16 @@ local check fails it also points at the cloud. Common ones:
   Path command, or use the interpreter `pip install -e .` used in a checkout.
   Or `pip install pyobjc-framework-Quartz pyobjc-framework-Vision
   pyobjc-framework-Cocoa` for that interpreter.
+- **iPhone over USB — `no-usbmux`**: the computer cannot see iPhones at all.
+  Windows: install the Apple Devices app or iTunes. Linux: install usbmuxd.
+- **iPhone over USB — WebDriverAgent will not start**: the error quotes
+  go-ios and names the step. Most often the signature expired (7 days with
+  a free Apple ID): sign and install it again, then trust the developer in
+  Settings > General > VPN & Device Management. Or Developer Mode is off.
+  The full go-ios logs are in the run directory (`phone-harness config path`),
+  `ios-usb-wda.log` and `ios-usb-tunnel.log`.
+- **iPhone over USB — `locked`**: unlock the phone; the harness never types
+  a passcode.
 - **Android — `unauthorized`**: unlock the phone and tap Allow on the "Allow
   USB debugging?" prompt (replug if it does not appear).
 - **Android — `no-device`**: USB debugging off, cable/port, or for Wi‑Fi:

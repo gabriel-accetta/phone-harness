@@ -1,5 +1,5 @@
 """Diagnostics: `phone-harness --doctor` walks the ladder for the phone the
-helpers would drive — the config default, or `--doctor ios|android`."""
+helpers would drive — the config default, or `--doctor ios|ios-usb|android`."""
 import os
 import shutil
 import subprocess
@@ -28,6 +28,8 @@ def run_doctor(platform=None):
     _failures.clear()
     if platform == "android":
         _doctor_android()
+    elif platform in ("ios-usb", "iphone-usb"):
+        _doctor_ios_usb()
     else:
         _doctor_ios()
     ok = not _failures
@@ -175,3 +177,95 @@ def _doctor_android():
     reg = config.devices_of("android")
     _check(f"remembered phones: {', '.join(reg['phones']) or 'none'}; primary: "
            f"{reg['primary'] or 'none'}", True)
+
+
+# --- iPhone over USB: go-ios -> usbmuxd -> phone -> trust -> Developer Mode ->
+#     WebDriverAgent installed -> WebDriverAgent running -> unlocked -> tree -----
+
+_GO_IOS_INSTALL = ("npm install -g go-ios, or a release from "
+                   "https://github.com/danielpaulus/go-ios/releases")
+
+
+def _doctor_ios_usb():
+    from . import config, ios_usb
+    path = ios_usb.go_ios_path()
+    if not _check(f"go-ios found ({path or config.get('ios_usb.go_ios')})", bool(path),
+                  _GO_IOS_INSTALL + ", or set ios_usb.go_ios to the binary"):
+        return
+    addr = ios_usb.external_wda()
+    if addr:
+        print(f"  (ios_usb.wda is {addr}: WebDriverAgent there is yours to run)")
+    try:
+        attached = list(ios_usb.usbmux_devices())
+    except ios_usb.UsbmuxError:
+        _check("Apple's USB service answers (usbmuxd)", False, ios_usb.usbmux_hint())
+        return
+    _check("Apple's USB service answers (usbmuxd)", True)
+    if not _check(f"an iPhone is attached over USB ({', '.join(attached) or 'none'})",
+                  bool(attached),
+                  "plug it in, unlock it, and tap Trust on 'Trust This Computer?'"):
+        return
+    try:
+        udid = ios_usb.pick_udid()
+    except RuntimeError as e:
+        _check("one iPhone to drive", False, str(e))
+        return
+    try:
+        info = ios_usb._info(udid)
+    except ios_usb.GoIOSError as e:
+        _check("the iPhone trusts this computer", False, ios_usb.explain(str(e)))
+        return
+    version = str(info.get("ProductVersion") or "?")
+    _check(f"talking to {info.get('DeviceName') or udid}, iOS {version}", True)
+    if ios_usb._major(version) >= 16:
+        on = ios_usb.developer_mode(udid)
+        _check("Developer Mode on" + (" (could not read it)" if on is None else ""),
+               on is not False,
+               "Settings > Privacy & Security > Developer Mode: turn it on, let the "
+               "phone restart, confirm")
+    if not addr:
+        try:
+            bundle = ios_usb.pick_bundle(udid)
+        except (RuntimeError, ios_usb.GoIOSError) as e:
+            _check("WebDriverAgent installed on the phone", False, str(e))
+            return
+        _check(f"WebDriverAgent installed ({bundle})", True)
+
+    where = addr or "over USB"
+    if ios_usb.connect_wda(udid).status() is None:
+        if not addr:
+            print("  ...starting WebDriverAgent, as the first helper call would "
+                  "(`phone-harness ios-usb stop` ends it)")
+        try:
+            ios_usb.start_link(udid, say=lambda msg: print(f"  ...{msg}"))
+        except RuntimeError as e:
+            _check(f"WebDriverAgent answers {where}", False, str(e))
+            return
+    _check(f"WebDriverAgent answers {where}", True)
+
+    phone = ios_usb.IPhoneUSB(udid)
+    state = phone.send("session.state")
+    _check(f"session state: {state}", state in ("ready", "locked"))
+    if state == "locked":
+        _check("phone unlocked", False, "unlock the phone; the harness never types a passcode",
+               fatal=False)
+        return
+    b = phone.send("screen.bounds")
+    _check(f"screen {b['w']}x{b['h']} points" if b else "screen size", bool(b))
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+        shot = f.name
+    try:
+        phone.send("screen.capture", path=shot)
+        size = os.path.getsize(shot)
+        with open(shot, "rb") as f:
+            png = f.read(8) == b"\x89PNG\r\n\x1a\n"
+        _check(f"screenshot works ({size} bytes)", png and size > 1000)
+    except RuntimeError as e:
+        _check("screenshot works", False, str(e)[:160])
+    finally:
+        os.unlink(shot)
+    try:
+        n = len(phone.send("tree"))
+        _check(f"accessibility tree readable ({n} nodes)", n > 0)
+    except RuntimeError as e:
+        _check("accessibility tree readable", False, str(e)[:160], fatal=False)

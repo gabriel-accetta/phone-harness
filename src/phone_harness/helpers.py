@@ -110,11 +110,22 @@ def screen_info():
 
     On iPhone Mirroring this still works when the session is blocked, as
     long as the mirroring window exists."""
-    from . import ocr as _vision
     path, win = send("screen.capture")
-    w, h = _vision.image_size(path)
+    w, h = _capture_size(path)
     return {"window": win, "frontmost": bool(send("focus.probe")[0]),
             "img_px": [w, h]}
+
+
+def _capture_size(path):
+    """(w, h) pixels of a capture. Every backend writes PNG, whose header
+    holds the size at a fixed offset, so this needs no Apple framework and
+    works off a Mac. Anything else goes to Vision."""
+    with open(path, "rb") as f:
+        head = f.read(24)
+    if head[:8] == b"\x89PNG\r\n\x1a\n" and head[12:16] == b"IHDR":
+        return int.from_bytes(head[16:20], "big"), int.from_bytes(head[20:24], "big")
+    from . import ocr as _vision
+    return _vision.image_size(path)
 
 
 def screenshot(path=None):
@@ -182,8 +193,9 @@ def screen(min_confidence=0.3):
     text label. `source` is "pixels" when a recogniser inferred the string and
     "tree" when the OS reported it exactly.
 
-    On Android the boxes come from the accessibility tree. On iPhone Mirroring
-    they come from recognizing the text in the mirror."""
+    On Android and on an iPhone over USB the boxes come from the
+    accessibility tree. On iPhone Mirroring they come from recognizing the
+    text in the mirror."""
     return send("screen.text", min_confidence=min_confidence)
 
 
@@ -218,9 +230,9 @@ def tap_text(query, index=0, exact=False):
 # --- accessibility tree (where the device has one) --------------------------
 
 def ui():
-    """The accessibility tree. Exact where screen() is inferred. Raises
-    Unsupported on iPhone Mirroring, whose window is an opaque video stream —
-    gate on supports('tree')."""
+    """The accessibility tree. Exact where screen() is inferred. Android and
+    an iPhone over USB have one. Raises Unsupported on iPhone Mirroring, whose
+    window is an opaque video stream — gate on supports('tree')."""
     return send("tree")
 
 

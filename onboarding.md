@@ -11,8 +11,8 @@ Check what this machine has: the OS, whether you can run and install
 commands, network access, and any phone (`phone-harness doctor`). Then tell
 the user in a sentence or two what you can drive from here, for example "This
 is a Linux box with no phone attached, so I can use a cloud iPhone or Android."
-iPhone Mirroring needs a Mac; without a Mac or a phone, the cloud (step 6) is
-the setup. If you cannot install anything, use the API:
+iPhone Mirroring needs a Mac; without one, an iPhone on a USB cable works
+(step 2); without a phone, the cloud (step 6) is the setup. If you cannot install anything, use the API:
 https://github.com/phone-harness/phone-harness/blob/main/setup/api.md
 
 ## 1. One question
@@ -37,6 +37,16 @@ Check first — `phone-harness doctor ios` — and only ask for what is missing.
 Whenever you capture or verify the screen, bring the Mirroring window forward
 so the user can see what you're doing.
 
+**No Mac (Windows or Linux), or no iPhone Mirroring:** drive the iPhone over a
+USB cable instead (`phone-harness config set platform ios-usb`). Install
+go-ios (`npm install -g go-ios`) and Apple's USB service yourself (Windows:
+the Apple Devices app or iTunes; Linux: usbmuxd). Then run
+`phone-harness doctor ios-usb` and walk the user through only what it says
+is missing, from https://github.com/phone-harness/phone-harness/blob/main/setup/ios-usb.md:
+Trust this computer, Developer Mode, WebDriverAgent signed with their Apple
+ID, and trusting that developer on the phone. Signing is theirs: never ask
+for their Apple ID password.
+
 ## 3. Android
 
 - Install adb (`brew install android-platform-tools`) and, optionally, scrcpy
@@ -53,8 +63,8 @@ Check with `phone-harness android` and `phone-harness --doctor android`.
 
 ## 4. Verify
 
-`phone-harness --doctor` for the default phone (add `ios` or `android` to
-check the other), then a read-only proof: `screenshot()` and `screen()`,
+`phone-harness --doctor` for the default phone (add `ios`, `ios-usb` or
+`android` to check another), then a read-only proof: `screenshot()` and `screen()`,
 and read what came back to the user.
 
 ## 5. Demo (opt-in)

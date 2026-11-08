@@ -19,10 +19,11 @@ USAGE = """Usage:
 Commands:
   phone-harness --session SID <<'PY'   pin one cloud phone for this process
   phone-harness --version, -V           print phone-harness <version>
-  phone-harness --doctor [ios|android]   diagnose the phone the helpers would drive
-  phone-harness doctor [ios|android]     same diagnosis as --doctor
+  phone-harness --doctor [ios|ios-usb|android]   diagnose the phone the helpers would drive
+  phone-harness doctor [ios|ios-usb|android]     same diagnosis as --doctor
   phone-harness skill       print the phone-harness skill text
   phone-harness android ... pair/connect/choose an Android phone
+  phone-harness ios-usb ... an iPhone on a USB cable, any OS: `ios-usb start`, `ios-usb stop`
   phone-harness cloud ...   start a catalog phone: `cloud login`, `cloud ls`, `cloud start [PHONE]`
   phone-harness config ...  settings: `config set platform android`
   phone-harness update      update this install: uv tool upgrade, git pull, or the pip command
@@ -152,7 +153,7 @@ def _telemetry_command(args):
         return "version"
     if first in {"--doctor", "doctor"}:
         return "doctor"
-    if first in {"android", "cloud", "config", "skill", "update"}:
+    if first in {"android", "cloud", "config", "ios-usb", "skill", "update"}:
         return first
     return "usage"
 
@@ -296,10 +297,10 @@ def _take_session(args):
     return out
 
 
-# These three parse their own argv, including --help. A leading --help is
-# the top-level parser, so only a bare command name takes this path.
+# These parse their own argv, including --help. A leading --help is the
+# top-level parser, so only a bare command name takes this path.
 # --version is handled before this, in any position.
-_OWNED = {"android", "cloud", "config"}
+_OWNED = {"android", "cloud", "config", "ios-usb"}
 
 
 def _version_text():
@@ -323,7 +324,7 @@ def _build_parser():
                         help=argparse.SUPPRESS)
     sub = parser.add_subparsers(
         dest="command", required=False,
-        metavar="{doctor,skill,config,update,cloud,android}",
+        metavar="{doctor,skill,config,update,cloud,android,ios-usb}",
     )
 
     doctor = sub.add_parser(
@@ -331,8 +332,8 @@ def _build_parser():
         help="diagnose the phone the helpers would drive",
         description="Diagnose the phone the helpers would drive.",
     )
-    doctor.add_argument("platform", nargs="?", metavar="ios|android",
-                        help="ios or android (default: the configured platform)")
+    doctor.add_argument("platform", nargs="?", metavar="ios|ios-usb|android",
+                        help="ios, ios-usb or android (default: the configured platform)")
     doctor.add_argument("extra", nargs=argparse.REMAINDER, help=argparse.SUPPRESS)
 
     skill = sub.add_parser(
@@ -365,6 +366,12 @@ def _build_parser():
         help="pair, connect, or choose an Android phone",
         add_help=False,
     ).add_argument("rest", nargs=argparse.REMAINDER, help=argparse.SUPPRESS)
+
+    sub.add_parser(
+        "ios-usb",
+        help="an iPhone on a USB cable through WebDriverAgent, from any OS",
+        add_help=False,
+    ).add_argument("rest", nargs=argparse.REMAINDER, help=argparse.SUPPRESS)
     return parser, {"doctor": doctor, "skill": skill}
 
 
@@ -379,6 +386,8 @@ def _dispatch_owned(name, rest):
         from .android import cli
     elif name == "cloud":
         from .cloud import cli
+    elif name == "ios-usb":
+        from .ios_usb import cli
     else:
         from .config import cli
     sys.exit(cli(rest))

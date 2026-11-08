@@ -1,6 +1,6 @@
 ---
 name: phone-harness
-description: "Control the user's phone - an iPhone through the Mac's iPhone Mirroring window, an Android over adb, a rented cloud Android, or a cloud iPhone over HTTPS: open apps, tap, type, swipe, read the screen."
+description: "Control the user's phone - an iPhone through the Mac's iPhone Mirroring window or over USB from any OS, an Android over adb, a rented cloud Android, or a cloud iPhone over HTTPS: open apps, tap, type, swipe, read the screen."
 ---
 
 # phone-harness
@@ -24,6 +24,7 @@ no hardware and is always the fallback.
 | Mode | Needs |
 | --- | --- |
 | Personal iPhone | macOS 15+, iPhone Mirroring paired to an iOS 18+ iPhone, Accessibility + Screen Recording for the app that runs Python |
+| Personal iPhone, no Mac | Windows, Linux or macOS; go-ios; Apple's USB service; a USB cable; WebDriverAgent on the phone, signed with the user's Apple ID |
 | Android on the desk | macOS, Linux or Windows; adb; USB debugging (or Wireless debugging, Android 11+) |
 | Cloud iPhone | HTTPS to phone-harness.com hosts; a signed-in account. No adb, any OS |
 | Cloud Android | the cloud iPhone list, plus adb and outbound TCP to the phone's adb port |
@@ -31,13 +32,13 @@ no hardware and is always the fallback.
 
 - If something is missing, name it and the one step the user can take.
 - Ask the user only to approve sign-in and to pick a phone.
-- Detail: [iPhone](https://github.com/phone-harness/phone-harness/blob/main/setup/ios.md), [Android](https://github.com/phone-harness/phone-harness/blob/main/setup/android.md),
+- Detail: [iPhone](https://github.com/phone-harness/phone-harness/blob/main/setup/ios.md), [iPhone over USB](https://github.com/phone-harness/phone-harness/blob/main/setup/ios-usb.md), [Android](https://github.com/phone-harness/phone-harness/blob/main/setup/android.md),
   [Cloud](https://github.com/phone-harness/phone-harness/blob/main/setup/cloud.md), [API](https://github.com/phone-harness/phone-harness/blob/main/setup/api.md).
 
 ## Helpers
 
 - `ensure_device()` - Screen bounds once the device is usable, or raises with what the user has to do.
-- `screen(min_confidence=0.3)` - Visible text as `{text, confidence, source, x, y, w, h}` boxes. On Android the boxes come from the accessibility tree; on iPhone Mirroring they come from recognizing text.
+- `screen(min_confidence=0.3)` - Visible text as `{text, confidence, source, x, y, w, h}` boxes. On Android and an iPhone over USB the boxes come from the accessibility tree; on iPhone Mirroring they come from recognizing text.
 - `screenshot(path=None)` - Capture the screen to a PNG, print its path, and return it.
 - `find_text(query, exact=False)` - Visible text boxes matching `query`.
 - `tap_text(query, index=0, exact=False)` - Tap the center of visible text matching `query`.
@@ -78,10 +79,11 @@ no hardware and is always the fallback.
 | **Cloud iPhone** - a second iPhone hosted by Phone Harness Cloud, not the one in the user's pocket; an iOS entry in the account catalog | `phone-harness cloud start` with its id, label, or `ios` when that is the only one | server-side OCR (`source: "pixels"`), from any OS | ops over HTTPS | Working method, then **Cloud iPhone** |
 | **Android on the desk** - USB or paired Wi-Fi | the harness finds it | accessibility tree (exact), Vision OCR fallback on a Mac | adb `input` | Working method, then **Android** |
 | **Personal iPhone** - the user's own phone, through the Mac's iPhone Mirroring window | the harness opens Mirroring and presses Connect; the user locks the phone | screenshots + Vision OCR | HID-level CGEvents into the window | Working method, then **iPhone** |
+| **Personal iPhone over USB** - the user's own phone on a cable, from any OS (`platform ios-usb`) | `ensure_device()` starts WebDriverAgent on it; the user keeps it unlocked | accessibility tree (exact) | XCTest touches through WebDriverAgent | Working method, then **iPhone over USB** |
 
 **"My phone" means the personal one.** The personal iPhone and the cloud
 iPhone are two different devices with different apps and logins: the first is
-in the user's pocket and mirrored onto the Mac, the second lives in a data
+in the user's pocket (mirrored onto the Mac, or on a USB cable), the second lives in a data
 centre and is reached over HTTPS. When the user says "my phone", "my iPhone",
 or names an app they use, drive the personal iPhone. Use a cloud phone only
 when the user names it ("the cloud phone", `cloud start`) or the task is
@@ -431,6 +433,62 @@ PY
   be reached, the error says the primary is unreachable. Do not expect the
   harness to connect some other paired or mDNS phone instead. When no
   primary is configured, a USB phone that is plugged in is still used.
+
+## iPhone over USB (WebDriverAgent)
+
+The user's own iPhone on a cable, from Windows, Linux or macOS.
+WebDriverAgent (Apple's XCTest automation) runs on the phone and the harness
+talks to it over the cable; nothing on the computer is involved.
+
+```bash
+PHONE_HARNESS_PLATFORM=ios-usb phone-harness <<'PY'
+ensure_device()                     # starts WebDriverAgent the first time
+open_app("Settings"); wait_for_app("com.apple.Preferences")
+tap_ui("General")                   # exact label from the accessibility tree
+PY
+```
+
+- **Start with `ensure_device()`.** The first call starts WebDriverAgent on
+  the phone: a few seconds, a minute or more the very first time while the
+  developer disk image downloads. It stays up across scripts until
+  `phone-harness ios-usb stop`.
+- **Coordinates are iOS points**, origin at the top left of the screen.
+  `screen()`, `ui()` and `tap()` all use them. A screenshot is in pixels
+  (points times 2 or 3): for a point measured in a screenshot use
+  `tap_image_point(x, y)`, never `tap()`.
+- **`screen()` is the accessibility tree** (`source: "tree"`): exact strings,
+  each once (a row's combined label is dropped when its own texts are
+  listed). `ui()` / `find_nodes()` / `tap_ui()` also see elements with no
+  visible text, by accessibility identifier (`id`); `class` is the
+  XCUIElementType. A game or canvas has no tree text: take a `screenshot()`
+  and look. On a Mac, `ocr_pixels()` reads it with Vision.
+- `open_app("Settings")` takes the name on the Home Screen or a bundle id
+  and returns the bundle id; Apple's own apps are known by name. When nothing
+  matches, the error lists what is installed. `current_app()` and
+  `list_apps()` exist. `back()` and `app_switcher()` do not: iOS has no Back
+  button, so tap the screen's own back control (top left; `ui()` shows its
+  label).
+- **`type_text` types on the on-screen keyboard**, whatever `keystrokes`
+  says: there is no clipboard shared with this computer. iOS autocorrect can
+  still change a word as it lands, so read the field back when it must be
+  exact. Any Unicode works. Tap the field first.
+- `press()` takes single keys (`"return"`, `"tab"`, `"delete"`, `"space"`,
+  `"home"`, `"volumeup"`); chords raise Unsupported.
+- `scroll` holds still before lifting so the list does not coast: walk lists
+  with it. `swipe` is a flick.
+- **A locked phone refuses input.** `connection_state()` is `locked`; taps
+  and `screen()` raise saying so. Ask the user to unlock - never type a
+  passcode. `screenshot()` still works while locked. The phone locks again
+  after its Auto-Lock time.
+- **Setup errors name the physical step**: Apple's USB service missing, no
+  phone, Trust, Developer Mode, WebDriverAgent not installed, or its
+  signature not trusted or expired (a free Apple ID signature lasts 7 days).
+  STOP and relay it; do not retry in a loop. `phone-harness doctor ios-usb`
+  walks them in order.
+- `shell("GET /status")` sends one raw WebDriverAgent request; `{session}`
+  in the path becomes the current session id.
+- Nothing on the computer is covered or focused, and `interruption(before,
+  after)` always reports nothing disturbed.
 
 ## iPhone (iPhone Mirroring)
 

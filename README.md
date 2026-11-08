@@ -27,7 +27,7 @@ Enable Claude Code, Codex, or any agent to use your real phone. The agent can
 scroll, tap, type, and read your phone with no jailbreak, no Xcode, and nothing
 installed on the phone.
 
-> **iPhone** through the Mac's iPhone Mirroring window <br/>
+> **iPhone** through the Mac's iPhone Mirroring window, or over USB from Windows, Linux or macOS <br/>
 > **Android** over adb from macOS, Linux or Windows <br/>
 > **Phone Harness Cloud** phone: an Android over adb, or an iPhone over HTTPS
 
@@ -64,6 +64,7 @@ The agent installs the CLI, asks which phone to use, and walks you through the s
 | Phone | Needs |
 | --- | --- |
 | **iPhone** | macOS 15+, iPhone Mirroring paired to an iOS 18+ iPhone, Accessibility and Screen Recording permission |
+| **iPhone over USB** (no Mac) | go-ios, a USB cable, and WebDriverAgent on the phone signed with your Apple ID; on Windows, Linux or macOS ([setup](setup/ios-usb.md)) |
 | **Android** | adb and USB debugging, on macOS, Linux or Windows |
 | **Cloud Android / iPhone** | [Phone Harness Cloud](https://phone-harness.com/dashboard?utm_source=github&utm_medium=readme&utm_campaign=setup-table) account; cloud Android also needs adb |
 
@@ -114,15 +115,17 @@ The same helpers drive a cloud phone: an Android over adb, an iPhone over HTTPS.
 Every phone sits behind the same helpers, so a script written for one runs on the others.
 
 - **iPhone:** captures the iPhone Mirroring window, reads it with Apple's Vision OCR, and sends taps, swipes and typing as input events.
+- **iPhone over USB:** WebDriverAgent (Apple's XCTest automation) on the phone, started with go-ios and reached over the cable; the accessibility tree for text. No port is opened on the computer.
 - **Android:** adb for screenshots and input, the accessibility tree for text. USB or Wi-Fi.
 - **Cloud Android:** the same as Android, over adb to a hosted phone.
 - **Cloud iPhone:** ops over HTTPS.
 
-`phone-harness config set platform ios|android` picks the default phone. `phone-harness update` upgrades the CLI, and it prints one line when a new version is out (`PHONE_HARNESS_NO_UPDATE_CHECK=1` silences it).
+`phone-harness config set platform ios|ios-usb|android` picks the default phone. `phone-harness update` upgrades the CLI, and it prints one line when a new version is out (`PHONE_HARNESS_NO_UPDATE_CHECK=1` silences it).
 
 ## Limits
 
-- Unlocking the iPhone pauses mirroring; a PIN-locked Android needs the user.
+- Unlocking the iPhone pauses mirroring; a locked iPhone over USB or a PIN-locked Android needs the user.
+- iPhone over USB needs WebDriverAgent re-signed every 7 days with a free Apple ID (yearly with a paid one).
 - OCR sees text, not icons. Unlabeled controls need a screenshot and a
   vision-capable model.
 - No multi-touch, no camera or Face ID flows. DRM video renders black.

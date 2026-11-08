@@ -374,8 +374,8 @@ class TopLevel(unittest.TestCase):
 
     def test_every_top_level_command_has_help(self):
         cases = (
-            (["doctor", "--help"], "ios|android"),
-            (["doctor", "-h"], "ios or android"),
+            (["doctor", "--help"], "ios|ios-usb|android"),
+            (["doctor", "-h"], "ios, ios-usb or android"),
             (["skill", "--help"], "phone-harness skill"),
             (["skill", "-h"], "show this help message"),
             (["config", "--help"], "config get"),
@@ -388,6 +388,8 @@ class TopLevel(unittest.TestCase):
             (["update", "-h"], "pip command"),
             (["cloud", "--help"], "cloud ls"),
             (["android", "--help"], "android pair"),
+            (["ios-usb", "--help"], "ios-usb start"),
+            (["ios-usb", "stop", "--help"], "Stop WebDriverAgent"),
         )
         for args, needle in cases:
             got = _run(*args)
@@ -450,7 +452,7 @@ class TopLevel(unittest.TestCase):
         env = {"PHONE_HARNESS_HOME": str(home)}
         bad = _run("config", "set", "platform", "nope", env=env)
         self.assertEqual(bad.returncode, 2)
-        self.assertIn("platform must be ios or android", bad.stdout)
+        self.assertIn("platform must be ios, ios-usb or android", bad.stdout)
         good = _run("config", "set", "platform", "android", env=env)
         self.assertEqual(good.returncode, 0, good.stderr)
         self.assertIn('platform = "android"', good.stdout)
